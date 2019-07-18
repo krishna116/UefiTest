@@ -1,0 +1,33 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = ArgumentManagerLib
+  FILE_GUID                      = 8F7D7B1D-0E1C-4c98-B12E-4EC99C190105
+  MODULE_TYPE                    = UEFI_DRIVER
+  VERSION_STRING                 = 1.0
+  LIBRARY_CLASS                  = ArgumentManagerLib|UEFI_APPLICATION UEFI_DRIVER
+
+#
+#  VALID_ARCHITECTURES           = X64
+#
+
+[Sources]
+  ArgumentManagerLib.c
+  
+[Packages]
+  MdePkg/MdePkg.dec
+  ShellPkg/ShellPkg.dec
+  KrishnaTestPkg/KrishnaTestPkg.dec
+
+[Protocols]
+  gEfiShellProtocolGuid
+  gEfiShellParametersProtocolGuid
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+  DebugLib
+  PrintLib
+  ShellLib
