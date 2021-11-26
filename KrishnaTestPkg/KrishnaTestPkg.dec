@@ -5,7 +5,7 @@
 
 [Defines]
   DEC_SPECIFICATION              = 0x00010005
-  PACKAGE_NAME                   = MsiTestPkg
+  PACKAGE_NAME                   = KrishnaTestPkg
   PACKAGE_GUID                   = 9C9AE3C5-2EF4-45C5-8A50-107838C6B32B
   PACKAGE_VERSION                = 1.0
 
