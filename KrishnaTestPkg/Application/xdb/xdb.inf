@@ -1,0 +1,37 @@
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = xdb
+  FILE_GUID                      = 8F7D7B1D-0E1C-4c98-B12E-4EC99C4081AE
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+#
+#  VALID_ARCHITECTURES           = X64
+#  build -p ShellPkg\ShellPkg.dsc -m ShellPkg\Application\xdb\xdb.inf -a X64 
+#
+
+[Sources]
+  main.c
+  Xdb.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  ShellPkg/ShellPkg.dec
+  RedfishPkg/RedfishPkg.dec
+
+[LibraryClasses]
+  UefiLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  BaseLib
+  DebugLib
+  JsonLib
+  ## Do not use ShellLib, because it conflicts with JsonLib when build it.
+
+[Protocols]
+  gEfiShellProtocolGuid                         ## CONSUMES
+  gEfiShellParametersProtocolGuid               ## CONSUMES 

@@ -54,6 +54,11 @@
 
   SafeIntLib|MdePkg/Library/BaseSafeIntLib/BaseSafeIntLib.inf
   ArgumentManagerLib|KrishnaTestPkg/Library/ArgumentManagerLib/ArgumentManagerLib.inf
+  
+  JsonLib|RedfishPkg/Library/JsonLib/JsonLib.inf
+  Ucs2Utf8Lib|RedfishPkg/Library/BaseUcs2Utf8Lib/BaseUcs2Utf8Lib.inf
+  RedfishCrtLib|RedfishPkg/PrivateLibrary/RedfishCrtLib/RedfishCrtLib.inf
+  BaseSortLib|MdeModulePkg/Library/BaseSortLib/BaseSortLib.inf
 
 [PcdsFixedAtBuild]
   gEfiMdePkgTokenSpaceGuid.PcdDebugPropertyMask|0xFF
@@ -68,6 +73,38 @@
   KrishnaTestPkg/Application/grep/grep.inf
   KrishnaTestPkg/Application/ReadHistory/ReadHistory.inf
   KrishnaTestPkg/Application/counter/counter.inf
+  
+  ## KrishnaTestPkg/Application/xdb/xdb.inf  ## please see follow note before build it.
+  ##  
+  ## To build this xdb.inf, you should modify edk2 source code(edk2-stable202108) as follow description.
+  ##
+  ## In "edk2\RedfishPkg\Include\Library\JsonLib.h", add follow declaration:
+  ##      EFI_STATUS
+  ##      EFIAPI
+  ##      JsonArrayInsertValue (
+  ##      IN    EDKII_JSON_ARRAY    JsonArray,
+  ##      IN    UINTN               Index,
+  ##      IN    EDKII_JSON_VALUE    Json
+  ##      );
+  ## 
+  ## In "edk2\RedfishPkg\Library\JsonLib\JsonLib.c", add follow code:
+  ##    EFI_STATUS
+  ##    EFIAPI
+  ##    JsonArrayInsertValue (
+  ##      IN    EDKII_JSON_ARRAY    JsonArray,
+  ##      IN    UINTN               Index,
+  ##      IN    EDKII_JSON_VALUE    Json
+  ##      )
+  ##    {
+  ##      if(json_array_insert((json_t*) JsonArray, Index, (json_t*) Json)!=0)
+  ##      {
+  ##        return EFI_ABORTED;
+  ##      }else
+  ##      {
+  ##        return EFI_SUCCESS;
+  ##      }
+  ##    }
+  ##
 
 
 [BuildOptions]
