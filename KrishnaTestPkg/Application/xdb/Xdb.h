@@ -26,6 +26,7 @@ typedef EFI_STATUS (*XDB_SET)(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value)
 typedef EFI_STATUS (*XDB_GET)(Xdb *This, CONST CHAR16 *Key);
 typedef EFI_STATUS (*XDB_PUSH)(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value, BOOLEAN isPushFront);
 typedef EFI_STATUS (*XDB_POP)(Xdb *This, BOOLEAN isPopFront);
+typedef EFI_STATUS (*XDB_APPEND)(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value);
 typedef EFI_STATUS (*XDB_CLEAR)(Xdb *This, CONST CHAR16 *Key);
 typedef EFI_STATUS (*XDB_SET_FILE_NAME)(Xdb *This, CONST CHAR16 *FileName);
 typedef CHAR16 *(*XDB_GET_FILE_NAME)(Xdb *This);
@@ -96,6 +97,7 @@ struct Xdb_
     XDB_GET                 Get;
     XDB_PUSH                Push;
     XDB_POP                 Pop;
+    XDB_APPEND              Append;
     XDB_CLEAR               Clear;
     XDB_SET_FILE_NAME       SetFileName;
     XDB_GET_FILE_NAME       GetFileName;
@@ -210,6 +212,29 @@ EFI_STATUS XdbPop(Xdb *This, BOOLEAN isPopFront);
  * 
  * @return EFI_SUCCESS      Operation success.
  * @return Others           Operation fail.
+ */
+
+/**
+ * @brief Append key-value pair.
+ * This function do not verify input file format and
+ * do not check duplicated keys in order to do fast 
+ * append key-value to the database.
+ * 
+ * @param[in] This              A xdb instance.
+ * @param[in] Key               Input key.
+ * @param[in] Value             Input value.
+ * 
+ * @return EFI_SUCCESS      Operation success.
+ * @return Others           Operation fail.
+ */
+EFI_STATUS XdbAppend(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value);
+
+/**
+ * @brief Set input file.
+ * 
+ * @param[in] This                  A xdb instance.
+ * @param[in] FileName              Filename.
+ * @return EFI_STATUS 
  */
 EFI_STATUS XdbSetFileName(Xdb *This, CONST CHAR16 *FileName);
 
@@ -541,4 +566,5 @@ EFI_STATUS XdbRootArrayInsert(Xdb *This, EDKII_JSON_VALUE Root, CONST CHAR8 *Inp
  */
 EFI_STATUS XdbExtractKeyAndValueFromJsonKeyValue(Xdb *This, EDKII_JSON_VALUE JsonKeyValue, CHAR8 **OutKey, CHAR8 **OutValue);
 
+EDKII_JSON_VALUE XdbOpenFileAndReadJson(Xdb *This);
 #endif //_XDB_H_

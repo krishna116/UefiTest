@@ -143,6 +143,10 @@ EFI_STATUS DoWork(Xdb *xdb, EFI_SHELL_PARAMETERS_PROTOCOL *Param)
         {
             return xdb->Pop(xdb, FALSE);
         }
+        else if (StrCmp(Argv[i], L"--append") == 0 && (i + 3) == Argc) //It is a  hidden option.
+        {
+            return xdb->Append(xdb, Argv[i + 1], Argv[i + 2]);
+        }
         else if (StrCmp(Argv[i], L"--erase") == 0 && (i + 2) == Argc)
         {
             return xdb->Clear(xdb, Argv[i + 1]);

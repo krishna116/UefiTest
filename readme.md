@@ -8,7 +8,7 @@ Currently, this project can be build with edk2-version: edk2-stable202108.
 4, run "build -p KrishnaTestPkg\KrishnaTestPkg.dsc -a X64" to build it.  
 
 
-### How to using it.  
+### How to use it.  
 Please refer user-guides under document directory.  
 
 ### Note.  

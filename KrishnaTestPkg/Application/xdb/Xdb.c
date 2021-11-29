@@ -44,6 +44,7 @@ Xdb *XdbCreate()
         X->Get =            XdbGet;
         X->Push =           XdbPush;
         X->Pop =            XdbPop;
+        X->Append =         XdbAppend;
         X->Clear =          XdbClear;
         X->SetFileName =    XdbSetFileName;
         X->GetFileName =    XdbGetFileName;
@@ -189,6 +190,79 @@ EFI_STATUS XdbPop(Xdb *This, BOOLEAN isPopFront)
     return Status;
 }
 
+EFI_STATUS XdbAppend(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value)
+{
+    ASSERT(This != NULL);
+    ASSERT(Key != NULL);
+    ASSERT(Value != NULL);
+
+    EFI_STATUS Status = EFI_ABORTED;
+    CHAR8* InputKey = NULL;
+    CHAR8* InputValue = NULL;
+
+    This->private_.CreateDefaultJsonFile(This, 0);
+    EDKII_JSON_VALUE Root = XdbOpenFileAndReadJson(This);
+    if(Root)
+    {
+        InputKey = This->private_.UnicodeToAscii(This, Key);
+        InputValue = This->private_.UnicodeToAscii(This, Value);
+        
+        if(InputKey && InputValue)
+        {
+            EDKII_JSON_VALUE NewJsonKeyValue = JsonValueInitObject();
+            if (NewJsonKeyValue)
+            {
+                EDKII_JSON_VALUE NewValue = JsonValueInitAsciiString(InputValue);
+                if (NewValue)
+                {
+                    if (JsonObjectSetValue(NewJsonKeyValue, InputKey, NewValue) == EFI_SUCCESS)
+                    {
+                        Status = JsonArrayAppendValue(Root,NewJsonKeyValue);
+                        if(Status != EFI_SUCCESS)
+                        {
+                            PrintError(L"Append key-value failed.\n");
+                        }
+                        else
+                        {
+                            Status = XdbSaveJson(This,Root);
+                            if(Status == EFI_SUCCESS)
+                            {
+                                XdbDumpKeyValue(This,"+",InputKey,InputValue );
+                            }
+                        }
+                    }
+                    else
+                    {
+                        PrintError(L"Update object->kv failed.\n");
+                    }
+                    JsonDecreaseReference(NewValue);
+                }
+                else
+                {
+                    PrintError(L"Create object->kv->value failed.\n");
+                }
+                JsonDecreaseReference(NewJsonKeyValue);
+            }
+            else
+            {
+                PrintError(L"Create object->kv failed.\n");
+            }
+        }
+
+        JsonDecreaseReference(Root);
+        if(InputKey) FreePool(InputKey);
+        if(InputValue) FreePool(InputValue);
+    }
+
+    if(Status != EFI_SUCCESS)
+    {
+        This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_KEY, InputKey);
+        This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_VALUE, mDefaultNullAsciiString);
+    }
+
+    return Status;
+}
+
 EFI_STATUS XdbSetFileName(Xdb *This, CONST CHAR16 *FileName)
 {
     ASSERT(This != NULL);
@@ -319,7 +393,7 @@ VOID XdbCreateDefaultJsonFile(Xdb *This, BOOLEAN IsForce)
     }
 }
 
-EDKII_JSON_VALUE XdbLoadJson(Xdb *This)
+EDKII_JSON_VALUE XdbOpenFileAndReadJson(Xdb *This)
 {
     ASSERT(This != NULL);
 
@@ -382,6 +456,14 @@ EDKII_JSON_VALUE XdbLoadJson(Xdb *This)
     {
         PrintError(L"Cannot open file to read: %s\n", FileName);
     }
+
+    return root;
+}
+
+EDKII_JSON_VALUE XdbLoadJson(Xdb *This)
+{
+
+    EDKII_JSON_VALUE root = XdbOpenFileAndReadJson(This);
 
     if (root)
     {
