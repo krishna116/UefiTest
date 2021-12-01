@@ -8,7 +8,7 @@
 
 #
 #  VALID_ARCHITECTURES           = X64
-#  build -p ShellPkg\ShellPkg.dsc -m ShellPkg\Application\xdb\xdb.inf -a X64 
+#  build -p KrishnaTestPkg\KrishnaTestPkg.dsc -m KrishnaTestPkg\Application\xdb\xdb.inf -a X64 
 #
 
 [Sources]

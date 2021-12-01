@@ -70,15 +70,28 @@
 [Components]
 
 [Components.X64]
+
+  ## build -p KrishnaTestPkg\KrishnaTestPkg.dsc -a X64
   KrishnaTestPkg/Application/grep/grep.inf
-  KrishnaTestPkg/Application/ReadHistory/ReadHistory.inf
+  KrishnaTestPkg/Application/history/history.inf
   KrishnaTestPkg/Application/counter/counter.inf
-  
-  ## KrishnaTestPkg/Application/xdb/xdb.inf  ## please see follow note before build it.
+
   ##  
-  ## To build this xdb.inf, you should modify edk2 source code(edk2-stable202108) as follow description.
+  ## This regex.efi has tiny-regex-c dependency(https://github.com/kokke/tiny-regex-c)
+  ## 1, download tiny-regex-c library.
+  ## 2, copy tiny-regex-c/re.c to KrishnaTestPkg/Application/regex/tiny-regex-c
+  ## 3, copy tiny-regex-c/re.h to KrishnaTestPkg/Application/regex/tiny-regex-c
+  ## 4, modify KrishnaTestPkg/Application/regex/tiny-regex-c/re.c as follow description:
+  ##    modify value(#define MAX_REGEXP_OBJECTS) to value(#define EFI_REGEX_PATTERN_STR_MAX_COUNT) in RegexWorker.h
+  ##    modify value(#define MAX_CHAR_CLASS_LEN) to value(#define EFI_REGEX_TEXT_STR_MAX_COUNT) in RegexWorker.h
+  ## 5, Now you can build [KrishnaTestPkg/Application/regex/regex.inf].
   ##
-  ## In "edk2\RedfishPkg\Include\Library\JsonLib.h", add follow declaration:
+  KrishnaTestPkg/Application/regex/regex.inf
+
+  ##  
+  ## To build this xdb.efi successfully, you should modify edk2 source code(edk2-stable202108) as follow description.
+  ##
+  ## 1, In "edk2\RedfishPkg\Include\Library\JsonLib.h", add follow declaration:
   ##      EFI_STATUS
   ##      EFIAPI
   ##      JsonArrayInsertValue (
@@ -87,7 +100,7 @@
   ##      IN    EDKII_JSON_VALUE    Json
   ##      );
   ## 
-  ## In "edk2\RedfishPkg\Library\JsonLib\JsonLib.c", add follow code:
+  ## 2, In "edk2\RedfishPkg\Library\JsonLib\JsonLib.c", add follow code:
   ##    EFI_STATUS
   ##    EFIAPI
   ##    JsonArrayInsertValue (
@@ -105,7 +118,9 @@
   ##      }
   ##    }
   ##
-
+  ## 3, Now you can build [KrishnaTestPkg/Application/xdb/xdb.inf].
+  ##
+  KrishnaTestPkg/Application/xdb/xdb.inf
 
 [BuildOptions]
   *_*_*_CC_FLAGS = -D DISABLE_NEW_DEPRECATED_INTERFACES

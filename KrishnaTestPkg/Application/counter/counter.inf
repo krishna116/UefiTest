@@ -8,7 +8,6 @@
 
 #
 #  VALID_ARCHITECTURES           = X64
-#  build -p ShellPkg\ShellPkg.dsc -m ShellPkg\Application\counter\counter.inf -a X64 
 #
 
 [Sources]

@@ -2,14 +2,16 @@
 #define __GREP_H__
 
 #include <Uefi.h>
-#include <Library/UefiApplicationEntryPoint.h>
-#include <Library/UefiLib.h>
-#include <Library/UefiBootServicesTableLib.h> //global gST gBS gImageHandle
+
+#include <Library/DebugLib.h>
 #include <Library/BaseMemoryLib.h>
 #include <Library/MemoryAllocationLib.h>
-#include <Library/DebugLib.h>
-#include <Library/PrintLib.h >
+#include <Library/PrintLib.h>
 #include <Library/ShellLib.h>
+#include <Library/UefiLib.h>
+#include <Library/UefiApplicationEntryPoint.h>
+#include <Library/UefiBootServicesTableLib.h> //global gST gBS gImageHandle
+
 #include <Library/ArgumentManagerLib.h>  //gArgumentManager
 
 #include <Protocol/Shell.h>
@@ -19,6 +21,7 @@
  * This application's name.
  */
 #define APP_NAME "grep"
+#define APP_VERSION_STR L"grep.efi version 0.1.0"
 
 /**
  * Using it to print verbose informations.

@@ -8,9 +8,9 @@ Mapping gMappingTable[] = {
     /// some option has alias like this.
     {L"-?",                         StepFirstHelpMessage,               NULL,                   NULL,                           NULL,                  NULL},
     {L"-h",                         StepFirstHelpMessage,               NULL,                   NULL,                           NULL,                  NULL},
-    {L"help",                       StepFirstHelpMessage,               NULL,                   NULL,                           NULL,                  NULL},
-    {L"-help",                      StepFirstHelpMessage,               NULL,                   NULL,                           NULL,                  NULL},
     {L"--help",                     StepFirstHelpMessage,               NULL,                   NULL,                           NULL,                  NULL},
+    {L"-v",                         StepFirstHelpVersion,               NULL,                   NULL,                           NULL,                  NULL},
+    {L"--version",                  StepFirstHelpVersion,               NULL,                   NULL,                           NULL,                  NULL},
 
     /// front iterator move to a number.
     {L"+",                          StepFirstNeedOneNumber,             Step2InputBuffer,       Step3FrontMoveN,                StepLastOutputBuffer,  NULL},
@@ -151,11 +151,10 @@ Parser gParser = {
 UINTN StepFirstHelpMessage(Parser *This)
 {
     ///_____--------------------80 char width-----------------------------------------------
-    Print(L"+-----------------------------------------------------------------------------+\n");
-    Print(L"|  grep.efi v2.1 for stream feature extraction.          --Krishna,2019-04-17 |\n");
-    Print(L"+-----------------------------------------------------------------------------+\n");
-    Print(L"Usage:\n");
-    Print(L"  grep.efi [option]\n");
+    Print(L"grep.efi [option]\n");
+    Print(L"\n");
+    Print(L"It is used to extract string features.\n");
+    Print(L"\n");
     Print(L"Options:\n");
     Print(L"  [+|-] [n]              //move a iterator by a number.\n");
     Print(L"                           1,[+|-]:front or reverse (iterator).\n");
@@ -179,6 +178,12 @@ UINTN StepFirstHelpMessage(Parser *This)
 
     return 0;
 };
+
+UINTN StepFirstHelpVersion(Parser *This)
+{
+    Print(L"%s\n", APP_VERSION_STR);
+    return 0;
+}
 
 UINTN ParserConstructor(Parser *This)
 {

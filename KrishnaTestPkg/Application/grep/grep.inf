@@ -20,6 +20,7 @@
 
 [Packages]
   MdePkg/MdePkg.dec
+  MdeModulePkg/MdeModulePkg.dec
   ShellPkg/ShellPkg.dec
   KrishnaTestPkg/KrishnaTestPkg.dec
 
@@ -28,12 +29,12 @@
   gEfiShellParametersProtocolGuid
 
 [LibraryClasses]
-  UefiApplicationEntryPoint
   UefiLib
-  BaseMemoryLib
-  MemoryAllocationLib
+  UefiApplicationEntryPoint
   UefiBootServicesTableLib
+  MemoryAllocationLib
+  BaseMemoryLib
+  BaseLib
   DebugLib
-  PrintLib
   ShellLib
   ArgumentManagerLib

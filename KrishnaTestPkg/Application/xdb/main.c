@@ -11,23 +11,6 @@
  * 
  * This tool is used to collect information/logs when run many tests.
  * 
- * Command line usage for example:
- *   xdb --push-back task1 "do something1."
- *   xdb --push-back task2 "do something2."
- *   xdb --push-back task3 "do something3."
- * 
- *   xdb --pop-front    ## fetch task1 and do something...
- *                      ## poped key and value will export to environment variable:
- *                      ## XDB_ENV_VARIABLE_KEY and XDB_ENV_VARIABLE_VALUE
- *                      ## and you can reference them by script.
- * 
- *   xdb --pop-front    ## fetch task2 and do something...
- *   xdb --pop-front    ## fetch task3 and do something...
- * 
- *   xdb result.log --set task1 "xxx is ok/fail"     ## new file can be used.
- *   xdb result.log --set task2 "aaa is ok/fail"
- *   xdb result.log --set task3 "bbb is ok/fail"
- * 
  * @param xdb               A Xdb instance.
  * @param Param             A shell parameters protocol instance.
  * 
@@ -143,7 +126,7 @@ EFI_STATUS DoWork(Xdb *xdb, EFI_SHELL_PARAMETERS_PROTOCOL *Param)
         {
             return xdb->Pop(xdb, FALSE);
         }
-        else if (StrCmp(Argv[i], L"--append") == 0 && (i + 3) == Argc) //It is a  hidden option.
+        else if (StrCmp(Argv[i], L"--append") == 0 && (i + 3) == Argc) //It is a hidden option for test.
         {
             return xdb->Append(xdb, Argv[i + 1], Argv[i + 2]);
         }

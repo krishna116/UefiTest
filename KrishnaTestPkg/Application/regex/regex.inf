@@ -1,0 +1,47 @@
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = regex
+  FILE_GUID                      = 860CC4EC-6CA7-4839-8558-573E8DC645D8
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+#
+#  VALID_ARCHITECTURES           = X64
+#
+
+[Sources]
+  crt/stdio.h
+  crt/ctype.h
+
+  tiny-regex-c/re.c
+
+  TinyRegexLib.c
+  RegexWorker.c
+  main.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  ShellPkg/ShellPkg.dec
+
+[Protocols]
+  gEfiShellProtocolGuid
+  gEfiShellParametersProtocolGuid
+  gEfiSimpleTextOutProtocolGuid
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+  DebugLib
+  ShellLib
+  PrintLib
+
+[BuildOptions]
+##
+## Disable warning C4189: 'types': local variable is initialized but not referenced.
+##
+MSFT:*_*_X64_CC_FLAGS = /wd4189

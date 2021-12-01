@@ -1,0 +1,36 @@
+
+[Defines]
+  INF_VERSION                    = 0x00010005
+  BASE_NAME                      = history
+  FILE_GUID                      = 4cee1f32-919f-46ea-81cf-940a02a264f8
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+#
+#  VALID_ARCHITECTURES           = X64
+#
+
+[Sources]
+  Historian.h
+  Historian.c
+  history.h
+  history.c
+
+[Packages]
+  MdePkg/MdePkg.dec
+  ShellPkg/ShellPkg.dec
+
+[Protocols]
+  gEfiShellProtocolGuid
+  gEfiShellParametersProtocolGuid
+  gEfiSimpleTextOutProtocolGuid
+
+[LibraryClasses]
+  UefiApplicationEntryPoint
+  UefiLib
+  BaseMemoryLib
+  MemoryAllocationLib
+  UefiBootServicesTableLib
+  DebugLib
+  ShellLib

@@ -126,6 +126,16 @@ UINTN Work(Parser *This);
 UINTN StepFirstHelpMessage(Parser *This);
 
 /**
+ * Show version message.
+ * The step should only be used in parser->work() function.
+ * 
+ * @param[IN]   This                      The instance of Parser.
+ * 
+ * @retval 0                                default value;
+ */
+UINTN StepFirstHelpVersion(Parser *This);
+
+/**
  * Test and make sure the reset args is empty.
  * The step should only be used in parser->work() function.
  * 
