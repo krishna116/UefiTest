@@ -1,73 +1,54 @@
 #ifndef __HISTORIAN__H__
 #define __HISTORIAN__H__
 
-#define WCHAR_LF                    0x000A
-#define WCHAR_CR                    0x000D
-#define WCHAR_F                     0x0046
-#define WCHAR_S                     0x0053
-#define WCHAR_SPACE                 0x0020
-#define WCHAR_BS                    0x0008
-
 typedef struct historian_ Historian;
 
-typedef UINTN (*HISTORIAN_CONSTRUCTOR)(Historian *This);
-typedef UINTN (*HISTORIAN_DESTRUCTOR)(Historian *This);
-typedef UINTN (*TELL_HISTORY)(Historian *This, UINTN DesiredRowCount, BOOLEAN IsOnlyGetLastLine);
-typedef UINTN (*PREPARE_OUTPUT_BUFFER)(Historian *This, CHAR16 *SourceBuffer, UINTN SourceRowCount, UINTN SourceColumnLength, CHAR16 **OutputBuffer, UINTN *OutputBufferLength);
+typedef Historian* (*HISTORIAN_CREATE)();
+typedef EFI_STATUS (*HISTORIAN_TELL_HISTORY)(Historian *This, UINTN DesiredRowCount, BOOLEAN IsOnlyGetLastLine);
+typedef VOID (*HISTORIAN_DESTROY)(Historian **This);
+
+typedef struct {
+    EFI_SHELL_PARAMETERS_PROTOCOL   *Param;
+    CHAR16                          *ScreenBuffer;
+    UINTN                           ScreenBufferLength;
+    UINTN                           RowsPerScreen;
+    UINTN                           ColsPerScreen;
+}HistorianPrivateInfo;
 
 struct historian_{
-    CHAR16                          *buffer;                ///< Make a copy from UEFI Shell's internal screen buffer.
-    UINTN                           bufferLength;           ///< Buffer item size,unit is CHAR16 not byte.
-    UINTN                           rowsPerScreen;          ///< Record UEFI Shell's internal console's height.
-    UINTN                           colsPerScreen;          ///< Record UEFI Shell's internal console's width.
-    EFI_HANDLE                      *handleBuffer;          ///< Store temp Handle buffer.
-    UINTN                           handleBufferLength;     ///< Temp Handle buffer length.
-    EFI_SHELL_PARAMETERS_PROTOCOL   *param;                 ///< The param binded on this imageHandle.
-    EFI_SHELL_PROTOCOL              *shell;                 ///< A shell reference.
+    //public:
+    HISTORIAN_TELL_HISTORY          TellStory;
+    HISTORIAN_DESTROY               Destroy;
 
-    /* public functions */
-    HISTORIAN_CONSTRUCTOR           constructor;            ///< Construct this.
-    HISTORIAN_DESTRUCTOR            destructor;             ///< Destruct this.
-    TELL_HISTORY                    tellStory;              ///< Tell recent lines of screen.
+    //private:
+    HistorianPrivateInfo            Private_;
 };
 
-extern Historian gHistorian;
+/**
+ * @brief Create a new historian.
+ * 
+ * @return NOT NULL     A new historian instance.
+ * @return NULL         Operation fail.
+ */
+Historian* HistorianCreate();
 
 /**
- * Construct a Historian.
- * @param[IN] This                  The instance of Historian.
+ * @brief Read console text-lines and output them.
  * 
- * @retval 1                        Operation pass.
- * @retval 0                        Operation failed.
+ * @param[in] This                  A historian instance
+ * @param[in] DesiredRowCount       Max desired row count.
+ * @param[in] IsOnlyGetLastLine     Only output last line.
+ * 
+ * @return EFI_SUCCESS              Operation success.
+ * @return Others                   Operation fail.
  */
-UINTN HistorianConstructor(Historian *This);
+EFI_STATUS HistorianTellStory(Historian *This, UINTN DesiredRowCount, BOOLEAN IsOnlyGetLastLine);
 
 /**
- * Destruct a Historian.
- * @param[IN] This                  The instance of Historian.
+ * @brief Historian destructor.
  * 
- * @retval 1                        Operation pass.
- * @retval 0                        Operation failed.
+ * @param[in] This      Historian instance address.
  */
-UINTN HistorianDestructor(Historian *This);
-
-/**
- * Tell recent lines of history messages.
- * 
- * @param[IN] This                  The instance of Historian.
- * @parma[IN] DesiredRowCount       How many recent history-message-lines to output,DesiredRowCount > 0.
- * @param[IN] IsOnlyGetLastLine     It is the last one line(counting from down to top)we will output.(It is our first line in screen-buffer's view.)
- * 
- * @retval 1                        Operation pass.
- * @retval 0                        Operation failed.
- */
-UINTN TellStory(Historian *This, UINTN DesiredRowCount, BOOLEAN IsOnlyGetLastLine);
-
-/**
- * Debug function,used to dump the screen-buffer-raw-data.
- * 
- * @param[IN] This                  The instance of Historian.
- */
-VOID Dump(Historian *This);
+VOID HistorianDestroy(Historian **This);
 
 #endif //__HISTORIAN__H__

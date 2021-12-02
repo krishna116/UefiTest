@@ -1,5 +1,5 @@
-#ifndef __READ_HISTORY__H__
-#define __READ_HISTORY__H__
+#ifndef _HISTORY_H_
+#define _HISTORY_H_
 
 #include <Uefi.h>
 #include <Library/UefiApplicationEntryPoint.h>
@@ -14,10 +14,13 @@
 #include <Protocol/ShellParameters.h>
 #include <Protocol/SimpleTextOut.h>
 
-/// Reference from Shell->ConsoleLogger.h
+#define APP_NAME                    "history"
+#define HISTORY_APP_VERSION_STR     L"history.efi version 0.1.0"
+
+// Reference from Shell->ConsoleLogger.h
 #define CONSOLE_LOGGER_PRIVATE_DATA_SIGNATURE SIGNATURE_32('c', 'o', 'P', 'D')
 
-/// Reference from Shell->ConsoleLogger.h
+// Reference from Shell->ConsoleLogger.h
 #pragma pack(1)
 typedef struct _CONSOLE_LOGGER_PRIVATE_DATA
 {
@@ -44,35 +47,13 @@ typedef struct _CONSOLE_LOGGER_PRIVATE_DATA
 } CONSOLE_LOGGER_PRIVATE_DATA;
 #pragma pack()
 
-/// Reference from Shell->ConsoleLogger.h
+// Reference from Shell->ConsoleLogger.h
 #define CONSOLE_LOGGER_PRIVATE_DATA_FROM_THIS(a) CR(a, CONSOLE_LOGGER_PRIVATE_DATA, OurConOut, CONSOLE_LOGGER_PRIVATE_DATA_SIGNATURE)
 
-/**
- * This application's name.
- */
-#define APP_NAME                    "history"
-#define HISTORY_APP_VERSION_STR     L"history.efi version 0.1.0"
-
-/**
- * Using it to print verbose informations.
- */
 #ifndef NO_VERBOSE
 #define PrintError(message, ...) Print(L"[%a][%d][%a]:" message, APP_NAME, __LINE__, __FUNCTION__, ##__VA_ARGS__)
 #else
 #define PrintError(message, ...)
 #endif
 
-/**
- * This application's help message.
- */
-VOID PrintUsageMsg();
-
-/**
- * Read some history messages from console.
- * 
- * @retval 1        Operation pass.
- * @retval 0        Operation failed.
- */
-UINTN ReadHistory();
-
-#endif //__READ_HISTORY__H__
+#endif //_HISTORY_H_

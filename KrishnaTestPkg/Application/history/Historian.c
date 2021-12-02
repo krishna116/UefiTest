@@ -1,234 +1,223 @@
 #include "history.h"
 #include "Historian.h"
 
-Historian gHistorian = {
-    NULL,
-    0,
-    0,
-    0,
-    NULL,
-    0,
-    NULL,
-    NULL,
+#define WCHAR_LF                    0x000A
+#define WCHAR_CR                    0x000D
+#define WCHAR_F                     0x0046
+#define WCHAR_S                     0x0053
+#define WCHAR_SPACE                 0x0020
+#define WCHAR_BS                    0x0008
 
-    HistorianConstructor,
-    HistorianDestructor,
-    TellStory,
-};
-
-UINTN HistorianConstructor(Historian *This)
+EFI_STATUS HistorianInitParam(Historian *This)
 {
-    EFI_STATUS status = 0;
-    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *simpleTextProtocol = NULL;
-    CONSOLE_LOGGER_PRIVATE_DATA *consoleInfo = NULL;
-
-    /// Make sure do not construct this more than once;
     ASSERT(This != NULL);
-    ASSERT(This->buffer == NULL);
-    ASSERT(This->handleBuffer == NULL);
 
-    status = gBS->LocateProtocol(&gEfiShellProtocolGuid, NULL, &(This->shell));
-    if (status != EFI_SUCCESS)
+    EFI_STATUS Status = EFI_ABORTED;
+
+    if(gBS->HandleProtocol(gImageHandle, &gEfiShellParametersProtocolGuid, &(This->Private_.Param)) == EFI_SUCCESS)
     {
-        PrintError(L"[Cannot locate shell.\n");
-        return 0;
+        Status = EFI_SUCCESS;
     }
-
-    status = gBS->HandleProtocol(gImageHandle, &gEfiShellParametersProtocolGuid, &(This->param));
-    if (status != EFI_SUCCESS)
+    else
     {
         PrintError(L"Cannot locate ParametersProtocol.\n");
-        return 0;
     }
 
-    status = gBS->LocateHandleBuffer(ByProtocol, &gEfiShellProtocolGuid, NULL, &This->handleBufferLength, &(This->handleBuffer));
-    if (status == EFI_SUCCESS)
+    return Status;
+}
+
+EFI_STATUS HistorianInitScreenBuffer(Historian *This)
+{
+    ASSERT(This != NULL);
+    ASSERT(This->Private_.ScreenBuffer == NULL);
+
+    EFI_STATUS Status = EFI_ABORTED;
+    EFI_HANDLE* ShellHandleBuffer=NULL;
+    UINTN ShellHandleBufferLength = 0;
+    CONSOLE_LOGGER_PRIVATE_DATA *ConsoleInfo = NULL;
+    EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *SimpleTextProtocol = NULL;
+
+    if(gBS->LocateHandleBuffer(ByProtocol, &gEfiShellProtocolGuid, NULL, &ShellHandleBufferLength, &ShellHandleBuffer) == EFI_SUCCESS)
     {
-        /// Assume there is only one shell instance in the system.
-        status = gBS->HandleProtocol(This->handleBuffer[0], &gEfiSimpleTextOutProtocolGuid, &simpleTextProtocol);
-        if (status == EFI_SUCCESS)
+        // Just try to get simple text protocol from first shell handle.
+        if(gBS->HandleProtocol(ShellHandleBuffer[0], &gEfiSimpleTextOutProtocolGuid, &SimpleTextProtocol) == EFI_SUCCESS)
         {
-            consoleInfo = CONSOLE_LOGGER_PRIVATE_DATA_FROM_THIS(simpleTextProtocol);
-            if (consoleInfo != NULL)
+            ConsoleInfo = CONSOLE_LOGGER_PRIVATE_DATA_FROM_THIS(SimpleTextProtocol);
+            This->Private_.ScreenBuffer = AllocateZeroPool(ConsoleInfo->BufferSize);
+            if (This->Private_.ScreenBuffer != NULL)
             {
-                This->buffer = AllocateZeroPool(consoleInfo->BufferSize);
-                if (This->buffer != NULL)
-                {
-                    CopyMem(This->buffer, consoleInfo->Buffer, consoleInfo->BufferSize);
-                    This->bufferLength = consoleInfo->BufferSize / sizeof(CHAR16);
-
-                    This->rowsPerScreen = consoleInfo->RowsPerScreen;
-                    This->colsPerScreen = consoleInfo->ColsPerScreen;
-
-                    return 1;
-                }
-                else
-                {
-                    PrintError(L"Out of memory.\n");
-                }
+                CopyMem(This->Private_.ScreenBuffer, ConsoleInfo->Buffer, ConsoleInfo->BufferSize);
+                This->Private_.ScreenBufferLength = ConsoleInfo->BufferSize / sizeof(CHAR16);
+                This->Private_.RowsPerScreen = ConsoleInfo->RowsPerScreen;
+                This->Private_.ColsPerScreen = ConsoleInfo->ColsPerScreen;
+                Status = EFI_SUCCESS;
             }
             else
             {
-                PrintError(L"Cannot locate consoleInfo.\n");
+                PrintError(L"Out of memory.\n");
             }
         }
         else
         {
             PrintError(L"Cannot locate SimpleTextOutProtocol.\n");
         }
+        FreePool(ShellHandleBuffer);
     }
     else
     {
-        PrintError(L"Cannot get ShellHandleBuffer.\n");
+        PrintError(L"Cannot locate all shell handles.\n");
     }
 
-    return 0;
+    return Status;
 }
 
-UINTN HistorianDestructor(Historian *This)
+Historian* HistorianCreate()
 {
-    ASSERT(This != NULL);
+    EFI_STATUS Status = EFI_ABORTED;
+    Historian* ThisHistorian = NULL;
 
-    if (This->buffer != NULL)
+    if((ThisHistorian = AllocateZeroPool(sizeof(Historian))) != NULL)
     {
-        FreePool(This->buffer);
-        This->buffer = NULL;
-    }
-
-    if (This->handleBuffer != NULL)
-    {
-        FreePool(This->handleBuffer);
-        This->handleBuffer = NULL;
-    }
-
-    return 1;
-}
-
-UINTN TellStory(Historian *This, UINTN DesiredRowCount, BOOLEAN IsOnlyGetLastLine)
-{
-    UINTN OneColumnSize = 0;
-    CHAR16 *outputPosition = NULL;
-
-    CHAR16 *outputBuffer = NULL;
-    UINTN outputBufferLength = 0;
-    UINTN byteSize = 0;
-    UINTN outputLineCount = 0;
-
-    CHAR16 *start = NULL;
-    CHAR16 *final = NULL;
-    CHAR16 *dest = NULL;
-    CHAR16 *source = NULL;
-
-    ASSERT(This != NULL);
-    ASSERT(This->buffer != NULL);
-    ASSERT(This->bufferLength != 0);
-
-    if(DesiredRowCount == 0) return 0;
-
-    /// Every line size is [ColsPerScreen + 2] used in uefi shell.
-    OneColumnSize = This->colsPerScreen + 2;
-    start = This->buffer;
-    while (start < (This->buffer + This->bufferLength))
-    {
-        if (*start == WCHAR_F && *(start + 1) == WCHAR_S)
+        ThisHistorian->Private_.Param = NULL;
+        if(HistorianInitParam(ThisHistorian) == EFI_SUCCESS)
         {
-            final = start;
-        }
-        start += OneColumnSize;
-    }
-
-    /// The final is the last line start with 'FS',it is the position where we execute this.efi.
-    if (final == NULL)
-    {
-        PrintError(L"Cannot locate app's current position.\n");
-        return 0;
-    }
-
-    /// This->buffer is the screen's first-line's begin.
-    /// final is the current line where we execute this.efi.
-    if ((This->buffer + (DesiredRowCount * OneColumnSize)) > final)
-    {
-        /// DesiredRowCount is out of range,just output This->buffer.
-        outputPosition = This->buffer;
-        outputLineCount = (final - This->buffer) / OneColumnSize;
-    }
-    else
-    {
-        /// Move up to desired line begin;
-        outputPosition = final - DesiredRowCount * OneColumnSize;
-        outputLineCount = DesiredRowCount;
-    }
-
-    if (IsOnlyGetLastLine)
-    {
-        outputLineCount = 1;
-    }
-
-    outputBufferLength = outputLineCount * This->colsPerScreen;
-    /// Allocate one more CHAR16 is used for string-terminator,but do not count it.
-    outputBuffer = AllocateZeroPool((outputBufferLength + 1) * sizeof(CHAR16));
-    if (outputBuffer != NULL)
-    {
-        dest = outputBuffer;
-        source = outputPosition;
-        byteSize = outputBufferLength * sizeof(CHAR16);
-
-        /// Every line size is [ColsPerScreen + 2] used in uefi shell,but we exclude the last two char.
-        for (UINTN line = 0; line < outputLineCount; line++)
-        {
-            CopyMem(dest, source, This->colsPerScreen * sizeof(CHAR16));
-            dest += OneColumnSize - 2;
-            source += OneColumnSize;
-        }
-
-        /// In Emulator(QEMU) the buffer may contain zero-value chars,it is not valid for output,convert them to space.
-        for (UINTN i = 0; i < outputBufferLength; i++)
-        {
-            if (outputBuffer[i] == 0)
+            ThisHistorian->Private_.ScreenBuffer = NULL;
+            if(HistorianInitScreenBuffer(ThisHistorian) == EFI_SUCCESS)
             {
-                outputBuffer[i] = WCHAR_SPACE;
+                ThisHistorian->TellStory = HistorianTellStory;
+                ThisHistorian->Destroy = HistorianDestroy;
+
+                Status = EFI_SUCCESS;
             }
         }
+    }
 
-        if (gEfiShellParametersProtocol != NULL && gEfiShellProtocol != NULL)
+    if(Status != EFI_SUCCESS) HistorianDestroy(&ThisHistorian);
+
+    return ThisHistorian;
+}
+
+EFI_STATUS HistorianTellStory(Historian *This, UINTN DesiredRowCount, BOOLEAN IsOnlyGetLastLine)
+{
+    EFI_STATUS Status = EFI_ABORTED;
+
+    UINTN OneColumnLineSize = 0;
+    CHAR16 *OutputPosition = NULL;
+
+    CHAR16 *OutputBuffer = NULL;
+    UINTN OutputBufferLength = 0;
+    UINTN OutputBufferByteSize = 0;
+    UINTN OutputLineCount = 0;
+
+    CHAR16 *Start = NULL;
+    CHAR16 *Final = NULL;
+    CHAR16 *Dest = NULL;
+    CHAR16 *Source = NULL;
+
+    ASSERT(This != NULL);
+
+    if(This->Private_.ScreenBuffer == NULL || 
+       This->Private_.ScreenBufferLength == 0 ||
+       DesiredRowCount == 0
+    )
+    {
+        return Status;
+    }
+
+    // Every line size is [ColsPerScreen + 2] used in uefi shell.
+    OneColumnLineSize = This->Private_.ColsPerScreen + 2;
+    Start = This->Private_.ScreenBuffer;
+    while (Start < (This->Private_.ScreenBuffer +This->Private_.ScreenBufferLength))
+    {
+        // Try to locate current position.
+        if (*Start == WCHAR_F && *(Start + 1) == WCHAR_S)
         {
-            gEfiShellProtocol->WriteFile(gEfiShellParametersProtocol->StdOut, &byteSize, (VOID *)outputBuffer);
-            gEfiShellProtocol->FlushFile(gEfiShellParametersProtocol->StdOut);
+            Final = Start;
+        }
+        Start += OneColumnLineSize;
+    }
+
+    // Check current position.
+    if (Final == NULL)
+    {
+        PrintError(L"Cannot locate app's current position.\n");
+        return Status;
+    }
+
+    // This->buffer is the screen's first-line's begin.
+    // Final is the current line where we execute this.efi.
+    if ((This->Private_.ScreenBuffer + (DesiredRowCount * OneColumnLineSize)) > Final)
+    {
+        /// DesiredRowCount is out of range,just output the present screen buffer.
+        OutputPosition = This->Private_.ScreenBuffer;
+        OutputLineCount = (Final - This->Private_.ScreenBuffer) / OneColumnLineSize;
+    }
+    else
+    {
+        // Move up to desired line begin;
+        OutputPosition = Final - DesiredRowCount * OneColumnLineSize;
+        OutputLineCount = DesiredRowCount;
+    }
+
+    if (IsOnlyGetLastLine) OutputLineCount = 1;
+
+    OutputBufferLength = OutputLineCount * This->Private_.ColsPerScreen;
+    // Allocate one more CHAR16 is used for string-terminator,but do not count it.
+    OutputBuffer = AllocateZeroPool((OutputBufferLength + 1) * sizeof(CHAR16));
+    if (OutputBuffer != NULL)
+    {
+        Dest = OutputBuffer;
+        Source = OutputPosition;
+        OutputBufferByteSize = OutputBufferLength * sizeof(CHAR16);
+
+        // Every line size is OneColumnLineSize(ColsPerScreen + 2) used in uefi shell,
+        // We should exclude the last two char.
+        for (UINTN line = 0; line < OutputLineCount; line++)
+        {
+            CopyMem(Dest, Source, This->Private_.ColsPerScreen * sizeof(CHAR16));
+            Dest += This->Private_.ColsPerScreen;
+            Source += OneColumnLineSize;
+        }
+
+        // In Emulator(QEMU) the buffer may contain zero-value chars, 
+        // it is not valid for output, convert them to space.
+        for (UINTN i = 0; i < OutputBufferLength; i++)
+        {
+            if (OutputBuffer[i] == 0) OutputBuffer[i] = WCHAR_SPACE;
+        }
+
+        if (gEfiShellProtocol != NULL)
+        {
+            gEfiShellProtocol->WriteFile(This->Private_.Param->StdOut, &OutputBufferByteSize, (VOID *)OutputBuffer);
+            gEfiShellProtocol->FlushFile(This->Private_.Param->StdOut);
+            Status = EFI_SUCCESS;
         }
         else
         {
-            Print(L"%s", outputBuffer);
+            PrintError(L"Need a shell instance to output.\n");
         }
 
-        if (outputBuffer != NULL)
-        {
-            FreePool(outputBuffer);
-            outputBuffer = NULL;
-        }
-
-        return 1;
+        FreePool(OutputBuffer);
     }
     else
     {
         PrintError(L"Out of memory\n");
     }
 
-    return 0;
+    return Status;
 }
 
-VOID Dump(Historian *This)
+VOID HistorianDestroy(Historian **This)
 {
-    if (This == NULL || This->buffer == NULL)
+    if(This && *This)
     {
-        return;
-    }
-
-    for (UINTN i = 0; i < This->bufferLength; i++)
-    {
-        Print(L"%02x-", This->buffer[i]);
-        if ((i + 1) % (This->colsPerScreen + 2) == 0)
+        if((*This)->Private_.ScreenBuffer)
         {
-            Print(L"z\n");
+            FreePool((*This)->Private_.ScreenBuffer);
+            (*This)->Private_.ScreenBuffer = NULL;
         }
+
+        FreePool(*This);
+        *This = NULL;
     }
 }

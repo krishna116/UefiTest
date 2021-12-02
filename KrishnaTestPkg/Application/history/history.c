@@ -1,13 +1,24 @@
 #include "history.h"
 #include "Historian.h"
 
+EFI_STATUS DoWork(Historian* This);
+
 EFI_STATUS
 EFIAPI
 UefiMain(
     IN EFI_HANDLE ImageHandle,
     IN EFI_SYSTEM_TABLE *SystemTable)
 {
-    return ReadHistory();
+    EFI_STATUS Status = EFI_ABORTED;
+    Historian* ThisHistorian = NULL;
+
+    if((ThisHistorian = HistorianCreate()) != NULL)
+    {
+        Status = DoWork(ThisHistorian);
+        ThisHistorian->Destroy(&ThisHistorian);
+    }
+
+    return Status;
 }
 
 EFI_STATUS PrintHelp()
@@ -31,18 +42,18 @@ EFI_STATUS PrintVersion()
     return EFI_SUCCESS;
 }
 
-EFI_STATUS ReadHistory()
+EFI_STATUS DoWork(Historian* This)
 {
+    ASSERT(This != NULL);
+
     UINTN Argc = 0;
     CHAR16** Argv = NULL;
     UINTN Number = 0;
     UINTN i = 1;
     EFI_STATUS Status = EFI_ABORTED;
 
-    if (gHistorian.constructor(&gHistorian) != 1) return Status;
-
-    Argc = gHistorian.param->Argc;
-    Argv = gHistorian.param->Argv;
+    Argc = This->Private_.Param->Argc;
+    Argv = This->Private_.Param->Argv;
 
     if(Argc <= 1) return PrintHelp();
 
@@ -50,19 +61,17 @@ EFI_STATUS ReadHistory()
     {
         if(StrCmp(Argv[i], L"-h") == 0 || StrCmp(Argv[i], L"--help") == 0)
         {
-            Status = PrintHelp();
-            break;
+            return PrintHelp();
         }
         else if(StrCmp(Argv[i], L"-v") == 0 || StrCmp(Argv[i], L"--version") == 0)
         {
-            Status = PrintVersion();
-            break;
+            return PrintVersion();
         }
         else if((StrCmp(Argv[i], L"-b") == 0 || StrCmp(Argv[i], L"--block") == 0) && (i+1)<Argc)
         {
             if (StrDecimalToUintnS(Argv[i+1], NULL, &Number) == RETURN_SUCCESS)
             {
-                Status = gHistorian.tellStory(&gHistorian, Number, 0);
+                return This->TellStory(This, Number, 0);
             }
             else
             {
@@ -74,7 +83,7 @@ EFI_STATUS ReadHistory()
         {
             if (StrDecimalToUintnS(Argv[i+1], NULL, &Number) == RETURN_SUCCESS)
             {
-                Status = gHistorian.tellStory(&gHistorian, Number, 1);
+                return This->TellStory(This, Number, 1);
             }
             else
             {
@@ -89,6 +98,5 @@ EFI_STATUS ReadHistory()
         }
     }
 
-    gHistorian.destructor(&gHistorian);
     return Status;
 }
