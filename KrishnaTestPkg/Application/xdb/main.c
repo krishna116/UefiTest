@@ -57,14 +57,19 @@ VOID ShowHelp()
     Print(L"Options:\n");
     Print(L"  --set <key> <value>           //create or update the key-value.\n");
     Print(L"  --get <key>                   //get the key-value.\n");
-    Print(L"  --erase <key>                 //erase the key-value.\n");
-    Print(L"  --push-front <key> <value>    //add a key-value at front.\n");
-    Print(L"  --push-back <key> <value>     //add a key-value at back.\n");
+    Print(L"  --push-front <key> <value>    //push a key-value at front.\n");
+    Print(L"  --push-back <key> <value>     //push a key-value at back.\n");
     Print(L"  --pop-front                   //pop a key-value at front.\n");
     Print(L"  --pop-back                    //pop a key-value at back.\n");
+    Print(L"  --append <key> <value>        //append the key-value(permit duplicate keys).\n");
+    Print(L"  --dump                        //dump all key-values in the database.\n");
+    Print(L"  --size                        //get database size(sum of key-values).\n");
+    Print(L"  --erase <key>                 //erase the key-value.\n");
     Print(L"  --clear                       //clear all data of the file.\n");
     Print(L"  --help                        //show help.\n");
     Print(L"  --version                     //show version.\n");
+    Print(L"Note:\n");
+    Print(L"  Output to shell variable: %a, %a, %a\n", XDB_ENV_VARIABLE_KEY, XDB_ENV_VARIABLE_VALUE, XDB_ENV_VARIABLE_SIZE);
     Print(L"\n");
 }
 
@@ -95,10 +100,16 @@ EFI_STATUS DoWork(Xdb *xdb, EFI_SHELL_PARAMETERS_PROTOCOL *Param)
     UINTN i = 1;
     while (i < Argc)
     {
-        if (StrLen(Argv[i]) >= 2 && *(Argv[i]) != '-' && !hasSetFileName)
+        if (StrLen(Argv[i]) >= 1 && *(Argv[i]) != '-' && !hasSetFileName)
         {
             xdb->SetFileName(xdb, Argv[i]);
             hasSetFileName = TRUE;
+            i += 1;
+            continue;
+        }
+        else if(StrCmp(Argv[i], L"--verbose") == 0)
+        {
+            xdb->SetVerboseMode(xdb, TRUE);
             i += 1;
             continue;
         }
@@ -109,6 +120,10 @@ EFI_STATUS DoWork(Xdb *xdb, EFI_SHELL_PARAMETERS_PROTOCOL *Param)
         else if (StrCmp(Argv[i], L"--get") == 0 && (i + 2) == Argc)
         {
             return xdb->Get(xdb, Argv[i + 1]);
+        }
+        else if (StrCmp(Argv[i], L"--append") == 0 && (i + 3) == Argc)
+        {
+            return xdb->Append(xdb, Argv[i + 1], Argv[i + 2]);
         }
         else if (StrCmp(Argv[i], L"--push-front") == 0 && (i + 3) == Argc)
         {
@@ -126,9 +141,13 @@ EFI_STATUS DoWork(Xdb *xdb, EFI_SHELL_PARAMETERS_PROTOCOL *Param)
         {
             return xdb->Pop(xdb, FALSE);
         }
-        else if (StrCmp(Argv[i], L"--append") == 0 && (i + 3) == Argc) //It is a hidden option for test.
+        else if (StrCmp(Argv[i], L"--dump") == 0)
         {
-            return xdb->Append(xdb, Argv[i + 1], Argv[i + 2]);
+            return xdb->Dump(xdb);
+        }
+        else if (StrCmp(Argv[i], L"--size") == 0)
+        {
+            return xdb->GetDatabaseSize(xdb);
         }
         else if (StrCmp(Argv[i], L"--erase") == 0 && (i + 2) == Argc)
         {

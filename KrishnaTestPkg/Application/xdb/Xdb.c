@@ -21,7 +21,7 @@ EFI_SHELL_PROTOCOL *GetEfiShellProtocol()
         (VOID **)&Shell);
     if (EFI_ERROR(Status))
     {
-        PrintError(L"Cannot get shell protocol.\n");
+        PrintError(L"Cannot get Shell protocol.\n");
         Shell = NULL;
     }
 
@@ -33,30 +33,33 @@ Xdb *XdbCreate()
     EFI_SHELL_PROTOCOL *CurrentShell = GetEfiShellProtocol();
     if (CurrentShell == NULL)
     {
-        PrintError("cannot find Efi shell protocol.\n");
+        PrintError("cannot find Efi Shell protocol.\n");
         return NULL;
     }
 
     Xdb *X = (Xdb *)AllocateZeroPool(sizeof(Xdb));
     if (X != NULL)
     {
-        X->Set =            XdbSet;
-        X->Get =            XdbGet;
-        X->Push =           XdbPush;
-        X->Pop =            XdbPop;
-        X->Append =         XdbAppend;
-        X->Clear =          XdbClear;
-        X->SetFileName =    XdbSetFileName;
-        X->GetFileName =    XdbGetFileName;
-        X->SetVerboseMode = XdbSetVerboseMode;
-        X->GetVerboseMode = XdbGetVerboseMode;
-        X->Destroy =        XdbDestroy;
+        X->Set =                XdbSet;
+        X->Get =                XdbGet;
+        X->Push =               XdbPush;
+        X->Pop =                XdbPop;
+        X->Append =             XdbAppend;
+        X->Dump =               XdbDump;
+        X->Clear =              XdbClear;
+        X->GetDatabaseSize =    XdbGetDatabaseSize;
+        X->SetFileName =        XdbSetFileName;
+        X->GetFileName =        XdbGetFileName;
+        X->SetVerboseMode =     XdbSetVerboseMode;
+        X->GetVerboseMode =     XdbGetVerboseMode;
+        X->Destroy =            XdbDestroy;
 
         X->private_.CreateDefaultJsonFile = XdbCreateDefaultJsonFile;
         X->private_.LoadJson =              XdbLoadJson;
         X->private_.CheckJson =             XdbCheckJson;
         X->private_.SaveJson =              XdbSaveJson;
         X->private_.UpdateEnvVariable =     XdbUpdateEnvVariable;
+        X->private_.UpdateEnvVariable2 =    XdbUpdateEnvVariable2;
         X->private_.UnicodeToAscii =        XdbUnicodeToAscii;
         X->private_.AsciiToUnicode =        XdbAsciiToUnicode;
         X->private_.CopyString =            XdbCopyString;
@@ -65,7 +68,7 @@ Xdb *XdbCreate()
         X->private_.InternalGet =           XdbInternalGet;
         X->private_.InternalPush =          XdbInternalPush;
         X->private_.InternalClear =         XdbInternalClear;
-        X->private_.DumpKeyValue =          XdbDumpKeyValue;
+        X->private_.PrintKeyValue =          XdbPrintKeyValue;
         X->private_.FindKey =               XdbFindKey;
 
         X->private_.RootArrayRemoveByKey =                  XdbRootArrayRemoveByKey;
@@ -78,7 +81,7 @@ Xdb *XdbCreate()
 
         X->private_.FileName =      NULL;
         X->private_.Shell =         CurrentShell;
-        X->private_.IsVerboseMode = 1;
+        X->private_.IsVerboseMode = 0;
     }
     else
     {
@@ -227,7 +230,7 @@ EFI_STATUS XdbAppend(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value)
                             Status = XdbSaveJson(This,Root);
                             if(Status == EFI_SUCCESS)
                             {
-                                XdbDumpKeyValue(This,"+",InputKey,InputValue );
+                                XdbPrintKeyValue(This, "[+] [", InputKey, "] ", "[", InputValue, "]", TRUE);
                             }
                         }
                     }
@@ -259,6 +262,42 @@ EFI_STATUS XdbAppend(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value)
         This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_KEY, InputKey);
         This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_VALUE, mDefaultNullAsciiString);
     }
+
+    return Status;
+}
+
+EFI_STATUS XdbDump(Xdb *This)
+{
+    ASSERT(This != NULL);
+
+    EFI_STATUS Status = EFI_ABORTED;
+    BOOLEAN OldVerboseMode = 0;
+    EDKII_JSON_VALUE Root = NULL;
+    EDKII_JSON_VALUE KeyAndValue = NULL;
+    CONST CHAR8 *ThisKey = NULL;
+    CONST CHAR8 *ThisValue = NULL;
+    UINTN Count = 0;
+    UINTN i=0;
+
+    XdbCreateDefaultJsonFile(This, 0);
+    OldVerboseMode = This->GetVerboseMode(This);
+    This->SetVerboseMode(This, TRUE);
+
+    if((Root = This->private_.LoadJson(This)) != NULL)
+    {
+        Count = JsonArrayCount(Root);
+        for(i = 0; i < Count; i++)
+        {
+            KeyAndValue = JsonArrayGetValue(Root, i);
+            ThisKey = JsonObjectIteratorKey(JsonObjectIterator(KeyAndValue));
+            ThisValue = JsonValueGetString(JsonObjectIteratorValue(JsonObjectIterator(KeyAndValue)));
+            This->private_.PrintKeyValue(This, "[", ThisKey, "] ", "[", ThisValue, "]", ((i+1) == Count));
+        }
+        JsonDecreaseReference(Root);
+        Status = EFI_SUCCESS;
+    }
+
+    This->SetVerboseMode(This, OldVerboseMode);
 
     return Status;
 }
@@ -307,6 +346,22 @@ EFI_STATUS XdbClear(Xdb *This, CONST CHAR16 *Key)
         FreePool(InputKey);
     }
 
+    return Status;
+}
+
+EFI_STATUS XdbGetDatabaseSize(Xdb *This)
+{
+    ASSERT(This != NULL);
+
+    EFI_STATUS Status = EFI_ABORTED;
+    XdbCreateDefaultJsonFile(This, 0);
+    EDKII_JSON_VALUE Root = XdbLoadJson(This);
+    if(Root)
+    {
+        Print(L"%ld\n", JsonArrayCount(Root));
+        JsonDecreaseReference(Root);
+        Status = EFI_SUCCESS;
+    }
     return Status;
 }
 
@@ -375,6 +430,11 @@ VOID XdbCreateDefaultJsonFile(Xdb *This, BOOLEAN IsForce)
             }
             Shell->CloseFile(FileHandle);
         }
+        else
+        {
+            PrintError(L"Open file errorcode = %ld, filename = %s\n", Status, FileName);
+            return;
+        }
     }
 
     if (needCreateNewJson || IsForce)
@@ -388,7 +448,7 @@ VOID XdbCreateDefaultJsonFile(Xdb *This, BOOLEAN IsForce)
         }
         else
         {
-            PrintError(L"Create new file[%s] failed..\n", FileName);
+            PrintError(L"Create file errorcode = %ld, filename = %s\n", Status, FileName);
         }
     }
 }
@@ -398,7 +458,7 @@ EDKII_JSON_VALUE XdbOpenFileAndReadJson(Xdb *This)
     ASSERT(This != NULL);
 
     EDKII_JSON_ERROR Error;
-    EDKII_JSON_VALUE root = NULL;
+    EDKII_JSON_VALUE Root = NULL;
     SHELL_FILE_HANDLE FileHandle;
     CONST CHAR16 *FileName = NULL;
 
@@ -420,8 +480,8 @@ EDKII_JSON_VALUE XdbOpenFileAndReadJson(Xdb *This)
             {
                 if (This->private_.Shell->ReadFile(FileHandle, &FileSize, FileBuffer) == EFI_SUCCESS)
                 {
-                    root = JsonLoadBuffer(FileBuffer, FileSize, 0, &Error);
-                    if (root == NULL)
+                    Root = JsonLoadBuffer(FileBuffer, FileSize, 0, &Error);
+                    if (Root == NULL)
                     {
                         PrintError(L"Error load and parse Json from file: %s\n", FileName);
                     }
@@ -446,7 +506,7 @@ EDKII_JSON_VALUE XdbOpenFileAndReadJson(Xdb *This)
             }
             else
             {
-                PrintError(L"Input file is too big, max size allowed = %ld.\n", XDB_INPUT_FILE_SIZE_MAX);
+                PrintError(L"Input file is too big, max Size allowed = %ld.\n", XDB_INPUT_FILE_SIZE_MAX);
             }
         }
 
@@ -457,43 +517,46 @@ EDKII_JSON_VALUE XdbOpenFileAndReadJson(Xdb *This)
         PrintError(L"Cannot open file to read: %s\n", FileName);
     }
 
-    return root;
+    if(Root) This->private_.UpdateEnvVariable2(This, XDB_ENV_VARIABLE_SIZE, JsonArrayCount(Root));
+
+    return Root;
 }
 
 EDKII_JSON_VALUE XdbLoadJson(Xdb *This)
 {
 
-    EDKII_JSON_VALUE root = XdbOpenFileAndReadJson(This);
+    EDKII_JSON_VALUE Root = XdbOpenFileAndReadJson(This);
 
-    if (root)
+    if (Root)
     {
         // Full check the json.
-        if (This->private_.CheckJson(This, root))
+        if (This->private_.CheckJson(This, Root))
         {
-            return root;
+            return Root;
         }
         else
         {
             PrintError(L"Invald json format.\n");
-            JsonDecreaseReference(root);
-            root = NULL;
+            JsonDecreaseReference(Root);
+            Root = NULL;
         }
     }
 
-    return root;
+    return Root;
 }
 
 BOOLEAN XdbCheckJson(Xdb *This, EDKII_JSON_VALUE Root)
 {
     ASSERT(This != NULL);
     BOOLEAN IsOk = TRUE;
+    UINTN Count = 0;
 
-    if (Root == NULL)
-        return FALSE;
+    if (Root == NULL) return FALSE;
 
     if (JsonValueIsArray(Root))
     {
-        for (UINTN i = 0; i < JsonArrayCount(Root); i++)
+        Count = JsonArrayCount(Root);
+        for (UINTN i = 0; i < Count; i++)
         {
             EDKII_JSON_VALUE *Object = JsonArrayGetValue(Root, i);
 
@@ -554,48 +617,49 @@ EFI_STATUS XdbSaveJson(Xdb *This, EDKII_JSON_VALUE Root)
     ASSERT(Root != NULL);
 
     EFI_STATUS Status = EFI_ABORTED;
-    EFI_SHELL_PROTOCOL *shell = This->private_.Shell;
+    EFI_SHELL_PROTOCOL *Shell = This->private_.Shell;
     CHAR16 *FileName = This->GetFileName(This);
     EFI_FILE_HANDLE FileHandle;
-    CHAR8 *str = NULL;
-    UINTN size = 0;
+    CHAR8 *Str = NULL;
+    UINTN Size = 0;
 
     if (FileName == NULL)
     {
         FileName = mDefaultInputFileName;
     }
 
-    str = JsonDumpString(Root, EDKII_JSON_INDENT(2) | EDKII_JSON_ENSURE_ASCII);
+    Str = JsonDumpString(Root, EDKII_JSON_INDENT(2) | EDKII_JSON_ENSURE_ASCII);
 
-    if (str)
+    if (Str)
     {
-        size = AsciiStrLen(str);
-        if (size > 0)
+        Size = AsciiStrLen(Str);
+        if (Size > 0)
         {
-            if (shell->CreateFile(FileName, 0, &FileHandle) == EFI_SUCCESS)
+            if (Shell->CreateFile(FileName, 0, &FileHandle) == EFI_SUCCESS)
             {
                 //resize file to zero.
-                EFI_FILE_INFO* FileInfo=shell->GetFileInfo(FileHandle);
+                EFI_FILE_INFO* FileInfo=Shell->GetFileInfo(FileHandle);
                 if(FileInfo)
                 {
                     FileInfo->FileSize=0;
-                    shell->SetFileInfo(FileHandle,FileInfo);
+                    Shell->SetFileInfo(FileHandle,FileInfo);
                     FreePool(FileInfo);
                 }
 
                 //There may be bug, may be we should close and reopen it to make resize-file take effect.
-                shell->CloseFile(FileHandle);
-                if(shell->CreateFile(FileName, 0, &FileHandle) == EFI_SUCCESS)
+                Shell->CloseFile(FileHandle);
+                if(Shell->CreateFile(FileName, 0, &FileHandle) == EFI_SUCCESS)
                 {
-                    if (EFI_SUCCESS == shell->WriteFile(FileHandle, &size, str))
+                    if (EFI_SUCCESS == Shell->WriteFile(FileHandle, &Size, Str))
                     {
-                        Status = shell->FlushFile(FileHandle);
+                        Status = Shell->FlushFile(FileHandle);
+                        This->private_.UpdateEnvVariable2(This, XDB_ENV_VARIABLE_SIZE, JsonArrayCount(Root));
                     }
                     else
                     {
                         PrintError(L"XdbSaveJson -> Write to this file failed: %s\n", FileName);
                     }
-                    shell->CloseFile(FileHandle);
+                    Shell->CloseFile(FileHandle);
                 }
             }
             else
@@ -608,7 +672,7 @@ EFI_STATUS XdbSaveJson(Xdb *This, EDKII_JSON_VALUE Root)
             PrintError(L"Dump json string is an empty string.\n");
         }
 
-        FreePool(str);
+        FreePool(Str);
     }
     else
     {
@@ -637,6 +701,17 @@ EFI_STATUS XdbUpdateEnvVariable(Xdb *This, CONST CHAR8 *EnvName, CONST CHAR8 *En
     return Status;
 }
 
+EFI_STATUS XdbUpdateEnvVariable2(Xdb *This, CONST CHAR8 *EnvName, UINTN EnvValue)
+{
+    CHAR8 Buffer[32];
+    UINTN BufferSize = sizeof(Buffer);
+    if(AsciiValueToStringS(Buffer,BufferSize,0,(INT64)EnvValue,10)==RETURN_SUCCESS)
+    {
+        return XdbUpdateEnvVariable(This,EnvName,Buffer);
+    }
+    return EFI_ABORTED;
+}
+
 CHAR8* XdbUnicodeToAscii(Xdb* This, CONST CHAR16* Str)
 {
     CHAR8* AsciiBuffer = NULL;
@@ -648,7 +723,7 @@ CHAR8* XdbUnicodeToAscii(Xdb* This, CONST CHAR16* Str)
     AsciiBufferSize = StrLen(Str);
     if(AsciiBufferSize>XDB_TOKEN_SIZE_MAX)
     {
-        PrintError(L"Input token size out of range, max size allowed is %d\n",XDB_TOKEN_SIZE_MAX);
+        PrintError(L"Input token Size out of range, max Size allowed is %d\n",XDB_TOKEN_SIZE_MAX);
         return NULL;
     }
 
@@ -684,7 +759,7 @@ CHAR16* XdbAsciiToUnicode(Xdb* This, CONST CHAR8* Str)
     AsciiStrLength = AsciiStrLen(Str);
     if(AsciiStrLength>XDB_TOKEN_SIZE_MAX)
     {
-        PrintError(L"Input token size out of range, max size allowed is %d\n",XDB_TOKEN_SIZE_MAX);
+        PrintError(L"Input token Size out of range, max Size allowed is %d\n",XDB_TOKEN_SIZE_MAX);
         return NULL;
     }
 
@@ -773,7 +848,7 @@ EFI_STATUS XdbInternalGet(Xdb *This, CONST CHAR8 *Key)
 
         if((Status = XdbRootArrayGetKeyValueByKey(This, Root, Key, &TempKey, &TempValue)) == EFI_SUCCESS)
         {
-            This->private_.DumpKeyValue(This, "g", TempKey, TempValue);
+            XdbPrintKeyValue(This, "[>] [", TempKey, "] ", "[", TempValue, "]", TRUE);
         }
 
         if(TempKey) FreePool(TempKey);
@@ -838,6 +913,7 @@ EFI_STATUS XdbInternalClear(Xdb *This, CONST CHAR8 *Key)
         
         This->private_.UpdateEnvVariable(This,XDB_ENV_VARIABLE_KEY, mDefaultNullAsciiString);
         This->private_.UpdateEnvVariable(This,XDB_ENV_VARIABLE_VALUE, mDefaultNullAsciiString);
+        This->private_.UpdateEnvVariable2(This, XDB_ENV_VARIABLE_SIZE, 0);
         Status = EFI_SUCCESS;
     }
     else
@@ -865,14 +941,35 @@ EFI_STATUS XdbInternalClear(Xdb *This, CONST CHAR8 *Key)
     return Status;
 }
 
-VOID XdbDumpKeyValue(Xdb *This, CONST CHAR8 *Prefix, CONST CHAR8 *Key, CONST CHAR8 *Value)
+VOID XdbPrintKeyValue(Xdb *This, 
+                    CONST CHAR8 *KeyPrefix, 
+                    CONST CHAR8 *Key,
+                    CONST CHAR8 *KeySuffix,
+                    CONST CHAR8 *ValuePrefix, 
+                    CONST CHAR8 *Value, 
+                    CONST CHAR8 *ValueSuffix,
+                    BOOLEAN IsUpdateEnvironmentVariable
+)
 {
-    if (This->GetVerboseMode(This) && Prefix && Key && Value)
+    ASSERT(This != NULL);
+
+    if(KeyPrefix == NULL || Key == NULL || KeySuffix == NULL ||
+      ValuePrefix == NULL || Value==NULL || ValueSuffix == NULL
+    )
     {
-        AsciiPrint("[pass][%a] %a = %a\n", Prefix, Key, Value);
+        return;
     }
-    This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_KEY, Key);
-    This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_VALUE, Value);
+
+    if (This->GetVerboseMode(This))
+    {
+        AsciiPrint("%a%a%a%a%a%a\n", KeyPrefix, Key, KeySuffix, ValuePrefix, Value, ValueSuffix);
+    }
+
+    if(IsUpdateEnvironmentVariable)
+    {
+        This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_KEY, Key);
+        This->private_.UpdateEnvVariable(This, XDB_ENV_VARIABLE_VALUE, Value);
+    }
 }
 
 BOOLEAN XdbFindKey(Xdb *This, EDKII_JSON_VALUE Root, CONST CHAR8 *Key, UINTN *Index)
@@ -968,7 +1065,7 @@ EFI_STATUS XdbRootArrayInsert(Xdb *This, EDKII_JSON_VALUE Root, CONST CHAR8 *Inp
                 {
                     if((Status = This->private_.SaveJson(This, Root)) == EFI_SUCCESS)
                     {
-                        This->private_.DumpKeyValue(This, "+", InputKey, InputValue);
+                        XdbPrintKeyValue(This, "[+] [", InputKey, "] ", "[", InputValue, "]", TRUE);
                     }
                 }
                 else
@@ -1015,7 +1112,7 @@ EFI_STATUS XdbRootArrayUpdate(Xdb *This, EDKII_JSON_VALUE Root, CONST CHAR8 *Inp
             {
                if(( Status = This->private_.SaveJson(This,Root)) == EFI_SUCCESS)
                {
-                    This->private_.DumpKeyValue(This, "u", InputKey, InputValue);
+                    XdbPrintKeyValue(This, "[>] [", InputKey, "] ", "[", InputValue, "]", TRUE);
                }
             }
             else
@@ -1095,7 +1192,7 @@ EFI_STATUS XdbRootArrayRemoveItemByIndex(Xdb *This, EDKII_JSON_VALUE Root, UINTN
         {
             if((Status = This->private_.SaveJson(This, Root)) == EFI_SUCCESS)
             {
-                This->private_.DumpKeyValue(This, "-", TempKey, TempValue);
+                XdbPrintKeyValue(This, "[-] [", TempKey, "] ", "[", TempValue, "]", TRUE);
             }
             else
             {

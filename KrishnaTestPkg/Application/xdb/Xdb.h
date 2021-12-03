@@ -7,10 +7,11 @@
 #include <Protocol/Shell.h>
 
 #define XDB_VERSION_STR             L"xdb.efi version 0.1.0"
-#define XDB_DEFAULT_INPUT_FILE      L".\\xdb.efi.log"
+#define XDB_DEFAULT_INPUT_FILE      L".\\xdb.efi.json"
 #define XDB_INPUT_FILE_SIZE_MAX     (1024 * 1024 * 2)
 #define XDB_ENV_VARIABLE_KEY        "XdbLastKey"
 #define XDB_ENV_VARIABLE_VALUE      "XdbLastValue"
+#define XDB_ENV_VARIABLE_SIZE       "XdbSize"
 #define XDB_DEFAULT_NULL_STR        "null"
 #define XDB_TOKEN_SIZE_MAX          256
 
@@ -27,7 +28,9 @@ typedef EFI_STATUS (*XDB_GET)(Xdb *This, CONST CHAR16 *Key);
 typedef EFI_STATUS (*XDB_PUSH)(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value, BOOLEAN isPushFront);
 typedef EFI_STATUS (*XDB_POP)(Xdb *This, BOOLEAN isPopFront);
 typedef EFI_STATUS (*XDB_APPEND)(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value);
+typedef EFI_STATUS (*XDB_DUMP)(Xdb *This);
 typedef EFI_STATUS (*XDB_CLEAR)(Xdb *This, CONST CHAR16 *Key);
+typedef EFI_STATUS (*XDB_GET_DATABASE_SIZE)(Xdb *This);
 typedef EFI_STATUS (*XDB_SET_FILE_NAME)(Xdb *This, CONST CHAR16 *FileName);
 typedef CHAR16 *(*XDB_GET_FILE_NAME)(Xdb *This);
 typedef EFI_STATUS (*XDB_SET_VERBOSE_MODE)(Xdb *This, BOOLEAN Value);
@@ -40,6 +43,7 @@ typedef BOOLEAN (*XDB_CHECK_JSON)(Xdb *This, EDKII_JSON_VALUE Root);
 typedef EFI_STATUS (*XDB_SAVE_JSON)(Xdb *This, EDKII_JSON_VALUE Root);
 typedef VOID (*XDB_CREATE_DEFATLT_JSON_FILE)(Xdb *This, BOOLEAN IsForce);
 typedef EFI_STATUS (*XDB_UPDATE_ENV_VARIABLE)(Xdb *This, CONST CHAR8 *EnvName, CONST CHAR8 *EnvValue);
+typedef EFI_STATUS (*XDB_UPDATE_ENV_VARIABLE2)(Xdb *This, CONST CHAR8 *EnvName, UINTN EnvValue);
 typedef CHAR8* (*XDB_UNICODE_TO_ASCII)(Xdb* This, CONST CHAR16* Str);
 typedef CHAR16* (*XDB_ASCII_TO_UNICODE)(Xdb* This, CONST CHAR8* Str);
 typedef EFI_STATUS (*XDB_COPY_STRING)(Xdb* This, CONST CHAR8* InString, CHAR8**OutString);
@@ -48,7 +52,15 @@ typedef EFI_STATUS (*XDB_INTERNAL_SET)(Xdb *This, CONST CHAR8 *Key, CONST CHAR8 
 typedef EFI_STATUS (*XDB_INTERNAL_GET)(Xdb *This, CONST CHAR8 *Key);
 typedef EFI_STATUS (*XDB_INTERNAL_PUSH)(Xdb *This, CONST CHAR8 *Key, CONST CHAR8 *Value, BOOLEAN isPushFront);
 typedef EFI_STATUS (*XDB_INTERNAL_CLEAR)(Xdb *This, CONST CHAR8 *Key);
-typedef VOID (*XDB_DUMP_KEY_VALUE)(Xdb *This, CONST CHAR8 *Prefix, CONST CHAR8 *Key, CONST CHAR8 *Value);
+typedef VOID (*XDB_PRINT_KEY_VALUE)(Xdb *This, 
+                                    CONST CHAR8 *KeyPrefix, 
+                                    CONST CHAR8 *Key,
+                                    CONST CHAR8 *KeySuffix,
+                                    CONST CHAR8 *ValuePrefix, 
+                                    CONST CHAR8 *Value, 
+                                    CONST CHAR8 *ValueSuffix,
+                                    BOOLEAN IsUpdateEnvironmentVariable
+);
 typedef BOOLEAN (*XDB_FIND_KEY)(Xdb *This, EDKII_JSON_VALUE Root, CONST CHAR8 *Key, UINTN *Index);
 
 typedef EFI_STATUS (*XDB_ROOT_ARRAY_REMOVE_BY_KEY)(Xdb *This, EDKII_JSON_VALUE Root, CONST CHAR8 *InputKey);
@@ -66,6 +78,7 @@ typedef struct
     XDB_CHECK_JSON                                  CheckJson;
     XDB_SAVE_JSON                                   SaveJson;
     XDB_UPDATE_ENV_VARIABLE                         UpdateEnvVariable;
+    XDB_UPDATE_ENV_VARIABLE2                        UpdateEnvVariable2;
     XDB_UNICODE_TO_ASCII                            UnicodeToAscii;
     XDB_ASCII_TO_UNICODE                            AsciiToUnicode;
     XDB_COPY_STRING                                 CopyString;
@@ -74,7 +87,7 @@ typedef struct
     XDB_INTERNAL_GET                                InternalGet;
     XDB_INTERNAL_PUSH                               InternalPush;
     XDB_INTERNAL_CLEAR                              InternalClear;
-    XDB_DUMP_KEY_VALUE                              DumpKeyValue;
+    XDB_PRINT_KEY_VALUE                             PrintKeyValue;
     XDB_FIND_KEY                                    FindKey;
 
     XDB_ROOT_ARRAY_REMOVE_BY_KEY                    RootArrayRemoveByKey;
@@ -98,7 +111,9 @@ struct Xdb_
     XDB_PUSH                Push;
     XDB_POP                 Pop;
     XDB_APPEND              Append;
+    XDB_DUMP                Dump;
     XDB_CLEAR               Clear;
+    XDB_GET_DATABASE_SIZE   GetDatabaseSize;
     XDB_SET_FILE_NAME       SetFileName;
     XDB_GET_FILE_NAME       GetFileName;
     XDB_SET_VERBOSE_MODE    SetVerboseMode;
@@ -220,14 +235,24 @@ EFI_STATUS XdbPop(Xdb *This, BOOLEAN isPopFront);
  * do not check duplicated keys in order to do fast 
  * append key-value to the database.
  * 
- * @param[in] This              A xdb instance.
- * @param[in] Key               Input key.
- * @param[in] Value             Input value.
+ * @param[in] This          A xdb instance.
+ * @param[in] Key           Input key.
+ * @param[in] Value         Input value.
  * 
  * @return EFI_SUCCESS      Operation success.
  * @return Others           Operation fail.
  */
 EFI_STATUS XdbAppend(Xdb *This, CONST CHAR16 *Key, CONST CHAR16 *Value);
+
+/**
+ * @brief Dump all key-values in the database.
+ * 
+ * @param This              A xdb instance.
+ * 
+ * @return EFI_SUCCESS      Operation success.
+ * @return Others           Operation fail.
+ */
+EFI_STATUS XdbDump(Xdb *This);
 
 /**
  * @brief Set input file.
@@ -274,6 +299,16 @@ CHAR16 *XdbGetFileName(Xdb *This);
  * @return Others           Operation fail.
  */
 EFI_STATUS XdbClear(Xdb *This, CONST CHAR16 *Key);
+
+/**
+ * @brief Get database size.
+ * 
+ * @param[in] This          A xdb instance.
+ * 
+ * @return EFI_SUCCESS      Operation success.
+ * @return Others           Operation fail.
+ */
+EFI_STATUS XdbGetDatabaseSize(Xdb *This);
 
 /**
  * @brief Set verbose mode and show more information.
@@ -364,6 +399,18 @@ VOID XdbCreateDefaultJsonFile(Xdb *This, BOOLEAN IsForce);
 EFI_STATUS XdbUpdateEnvVariable(Xdb *This, CONST CHAR8 *EnvName, CONST CHAR8 *EnvValue);
 
 /**
+ * @brief Update uefi shell environment variable.
+ * 
+ * @param[in] This              A xdb instance.
+ * @param[in] EnvName           Environment variable name.
+ * @param[in] EnvValue          Environment variable value.
+ * 
+ * @return EFI_SUCCESS          Operation success.
+ * @return Others               Operation fail.
+ */
+EFI_STATUS XdbUpdateEnvVariable2(Xdb *This, CONST CHAR8 *EnvName, UINTN EnvValue);
+
+/**
  * @brief Convert ucs2 string to Ascii string.
  * 
  * @param[in] This      A xdb instance.
@@ -442,15 +489,26 @@ EFI_STATUS XdbInternalPush(Xdb *This, CONST CHAR8 *Key, CONST CHAR8 *Value, BOOL
 EFI_STATUS XdbInternalClear(Xdb *This, CONST CHAR8 *Key);
 
 /**
- * @brief Dump key-value and export them to environment variable.
- * This function usually used when get/set/push/pop/clear key-value success.
+ * @brief Print key and value to console.
  * 
- * @param[in] This          A xdb instance.
- * @param[in] Prefix        A prefix string.
- * @param[in] Key           Input key.
- * @param[in] Value         Input value.
+ * @param[in] This                          A xdb instance.
+ * @param[in] KeyPrefix                     Key prefix.
+ * @param[in] Key                           Key.
+ * @param[in] KeySuffix                     key suffix.
+ * @param[in] ValuePrefix                   Value prefix.
+ * @param[in] Value                         Value
+ * @param[in] ValueSuffix                   Value suffix.
+ * @param[in] IsUpdateEnvironmentVariable   Update env-vars or not.
  */
-VOID XdbDumpKeyValue(Xdb *This, CONST CHAR8 *Prefix, CONST CHAR8 *Key, CONST CHAR8 *Value);
+VOID XdbPrintKeyValue(Xdb *This, 
+                    CONST CHAR8 *KeyPrefix, 
+                    CONST CHAR8 *Key,
+                    CONST CHAR8 *KeySuffix,
+                    CONST CHAR8 *ValuePrefix, 
+                    CONST CHAR8 *Value, 
+                    CONST CHAR8 *ValueSuffix,
+                    BOOLEAN IsUpdateEnvironmentVariable
+);
 
 /**
  * @brief Find the key in the json-root-tree and output the key's index if success.
