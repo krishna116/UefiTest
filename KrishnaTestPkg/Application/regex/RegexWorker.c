@@ -285,7 +285,7 @@ CHAR16* ReadInputFromStdin(RegexWorker* This)
     This->Private_.Shell->ReadFile(This->Private_.Param->StdIn, &BufferByteSize, This->Private_.Text);
     if(BufferByteSize > 0)
     {
-        if(This->Private_.Text[0] == 0xFEFF) // Sikp UCS2-BOM in front of the buffer.
+        if(This->Private_.Text[0] == 0xFEFF) // Skip UCS2-BOM in front of the buffer.
         {
             BufferRef = &(This->Private_.Text[1]);
         }

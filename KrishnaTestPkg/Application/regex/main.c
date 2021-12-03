@@ -92,7 +92,7 @@ EFI_STATUS Work(RegexWorker* Worker)
         {
             return PrintHelp();
         }
-        else if(StrCmp(Argv[i], L"-v") == 0)
+        else if(StrCmp(Argv[i], L"-v") == 0 || StrCmp(Argv[i], L"--version") == 0)
         {
             return PrintVersion();
         }
